@@ -14,7 +14,7 @@
     "lil-gui": "^0.19.2",
     "three": "^0.112.1",
     "three-orbit-controls": "^82.1.0",
-    "tweakpane": "^4.0.4"
+    "tweakpane": "^4.0.5"
   },
   "devDependencies": {
     "cssnano": "^4.1.11",
