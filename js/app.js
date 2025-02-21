@@ -232,6 +232,10 @@ export default class Sketch {
 
         // Ajouter cette propriété pour suivre le dernier point affiché
         this.lastLoggedPointIndex = -1;
+
+        // Ajouter la référence à l'élément de couleur
+        const colorParent = document.querySelector('.tp-v-vfst');
+        this.colorElement = colorParent ? colorParent.querySelector('.tp-sglv') : null;
     }
 
     getRenderTarget() {
@@ -595,7 +599,8 @@ export default class Sketch {
         logFolder.addBinding(this.settings, 'postCharColor', {
             view: 'color',
             readonly: true,
-            label: 'Color'
+            label: 'Color',
+            id: 'charColor'
         });
 
         logFolder.addBinding(this.settings, 'postLog', {
@@ -1013,8 +1018,12 @@ export default class Sketch {
             const character = this.characters.find(c => c.name === nearestPost.character);
             
             this.settings.postLog = `${nearestPost.uid}\n${nearestPost.character}\n${nearestPost.thematic}\n${character.numposts} posts`;
-
             this.settings.postCharColor = character.color;
+
+            // Mettre à jour directement l'élément de couleur si il existe
+            if (this.colorElement) {
+                this.colorElement.style.backgroundColor = character.color;
+            }
         }
         
         // Remettre le render target par défaut
