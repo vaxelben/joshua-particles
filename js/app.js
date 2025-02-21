@@ -3,8 +3,6 @@ import Stats from 'https://cdnjs.cloudflare.com/ajax/libs/stats.js/17/Stats.js';
 import { Pane } from 'https://cdn.jsdelivr.net/npm/tweakpane@4.0.5/dist/tweakpane.min.js';
 import chroma from 'https://cdn.jsdelivr.net/npm/chroma-js@2.4.2/+esm';
 
-import postsData from '../assets/data/posts.json';
-
 async function loadShader(url) {
     const response = await fetch(url);
     return await response.text();
@@ -14,6 +12,7 @@ export default class Sketch {
     constructor(options) {
         this.scene = new THREE.Scene();
         this.shaders = options.shaders;
+        this.posts = options.postsData;
 
         this.container = options.dom;
         this.width = this.container.offsetWidth;
@@ -93,7 +92,6 @@ export default class Sketch {
 
         document.addEventListener('mousemove', this.handleMouseMove.bind(this));
 
-        this.posts = postsData;
         this.size = this.posts.length;
 
         // Créer des Sets avec les valeurs uniques
@@ -903,7 +901,9 @@ export default class Sketch {
 }
 
 async function init() {
-    const shaders = await Promise.all([
+    // Charger les données et les shaders en parallèle
+    const [postsData, ...shaders] = await Promise.all([
+        fetch('./assets/data/posts.json').then(r => r.json()),
         loadShader('./js/shader/fragment.glsl'),
         loadShader('./js/shader/vertexParticles.glsl'),
         loadShader('./js/shader/simFragment.glsl'),
@@ -927,7 +927,8 @@ async function init() {
             simFragment,
             simVertex,
             nearestPointFragment
-        }
+        },
+        postsData // Passer les données au constructeur
     });
 }
 
