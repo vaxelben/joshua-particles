@@ -94,31 +94,105 @@ export default class Sketch {
 
         this.size = this.posts.length;
 
-        // Créer des Sets avec les valeurs uniques
-        this.uniqueCharacters = [...new Set(this.posts.map(post => post.character))];
+        // console.log('Posts:', this.posts);
+
+        // Créer des Sets avec les valeurs uniques et trier par ordre alphabétique
+        this.uniqueCharacters = Object.values(this.posts.reduce((acc, { character, postCharacterRank }) => {
+            acc[character] = acc[character]?.postCharacterRank >= postCharacterRank 
+                ? acc[character] 
+                : { character, postCharacterRank };
+            return acc;
+        }, {})).sort((a, b) => a.character.localeCompare(b.character));
+                  
         this.uniqueThematics = [...new Set(this.posts.map(post => post.thematic))];
 
+        console.log('Unique characters:', this.uniqueCharacters);
+        
         this.distinctCharacters = this.uniqueCharacters.length;
         this.distinctThematics = this.uniqueThematics.length;
 
         console.log('Nombre de personnages distincts:', this.distinctCharacters);
         console.log('Nombre de thématiques distinctes:', this.distinctThematics);
 
-        // Créer les palettes de couleurs
-        this.characterColors = chroma.scale(['#FF0000', '#00FF00', '#0000FF'])
-            .mode('lch')
-            .colors(this.distinctCharacters);
+        // Créer la texture de palette de couleurs avec des couleurs plus distinctes
+        
+        const distinctCharactersColors = [
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ff00ff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff',
+            '#ffffff'
+        ];
+
+        // S'assurer d'avoir assez de couleurs
+        while (distinctCharactersColors.length < this.distinctCharacters) {
+            distinctCharactersColors.push(chroma.random().hex());
+        }
+
+        this.characters = this.uniqueCharacters.map((char, index) => ({
+            index,
+            name: char.character,
+            numposts: char.postCharacterRank,
+            color: distinctCharactersColors[index]
+        }));
+
+        console.log('this.characters:', this.characters);
         
         this.thematicColors = chroma.scale(['#FFD700', '#FF1493', '#4B0082'])
             .mode('lch')
             .colors(this.distinctThematics);
 
         // Créer des maps pour accéder rapidement aux indices
-        this.characterColorMap = new Map(this.uniqueCharacters.map((char, i) => [char, i]));
+        this.charactersMap = new Map(this.characters.map((char, i) => [char.name, i]));
+        this.characterColorMap = new Map(this.characters.map((char, i) => [char.name, i]));
         this.thematicColorMap = new Map(this.uniqueThematics.map((theme, i) => [theme, i]));
 
-        console.log('Palette des personnages:', this.characterColors);
-        console.log('Palette des thématiques:', this.thematicColors);
+        console.log('this.charactersMap:', this.charactersMap);
 
         this.time = 0;
 
@@ -180,7 +254,7 @@ export default class Sketch {
     
         this.ball = new THREE.Mesh(
             new THREE.SphereGeometry(0.1, 32, 32),
-            new THREE.MeshBasicMaterial({ color: 0xff0000 })
+            new THREE.MeshBasicMaterial({ color: 0xffffff })
         );
         this.scene.add(this.ball);
         this.ball.visible = false;
@@ -264,9 +338,6 @@ export default class Sketch {
         const textureWidth = Math.min(Math.ceil(Math.sqrt(this.size)), 4096);
         const textureHeight = Math.ceil(this.size / textureWidth);
         
-        console.log('Nombre total de posts/points:', this.size);
-        console.log('Dimensions de la texture:', textureWidth, 'x', textureHeight);
-        
         this.textureWidth = textureWidth;
         this.textureHeight = textureHeight;
 
@@ -332,7 +403,6 @@ export default class Sketch {
                 interpolationAmount: { value: this.settings.interpolationAmount },
                 mouseRepulsion: { value: this.settings.mouseRepulsion },
                 curlAmount: { value: 0 },
-                uNearestPointIndex: { value: -1 },
             },
             vertexShader: this.shaders.simVertex,
             fragmentShader: this.shaders.simFragment
@@ -341,10 +411,22 @@ export default class Sketch {
         this.infoArray = new Float32Array(textureWidth * textureHeight * 4);
 
         for (let i = 0; i < this.size; i++) {
-            this.infoArray[i * 4 + 0] = 0.5 + Math.random();
-            this.infoArray[i * 4 + 1] = 0.5 + Math.random();
-            this.infoArray[i * 4 + 2] = 1.;
-            this.infoArray[i * 4 + 3] = 1.;
+            const post = this.posts[i];
+            const characterIndex = this.charactersMap.get(post.character);
+            
+            // Vérifier que l'index est valide
+            if (characterIndex >= this.distinctCharacters) {
+                console.error(`Index invalide pour le personnage ${post.character}:`, {
+                    index: characterIndex,
+                    maxIndex: this.distinctCharacters - 1
+                });
+            }
+            
+            // Stocker l'index du personnage dans le canal alpha
+            this.infoArray[i * 4 + 0] = 0; // On peut utiliser ces canaux pour d'autres infos
+            this.infoArray[i * 4 + 1] = 0;
+            this.infoArray[i * 4 + 2] = 0;
+            this.infoArray[i * 4 + 3] = characterIndex; // Stocker l'index directement sans normalisation
         }
 
         this.infoTexture = new THREE.DataTexture(
@@ -354,6 +436,7 @@ export default class Sketch {
             THREE.RGBAFormat,
             THREE.FloatType
         );
+
         this.infoTexture.minFilter = THREE.NearestFilter;
         this.infoTexture.magFilter = THREE.NearestFilter;
         this.infoTexture.needsUpdate = true;
@@ -380,20 +463,41 @@ export default class Sketch {
                 uPosition: { value: null },
                 resolution: { value: new THREE.Vector4() },
                 uNearestPointIndex: { value: -1 },
+                uColors: { 
+                    value: this.characters.map(charInfo => {
+                        const rgb = chroma(charInfo.color).rgb();
+                        return new THREE.Vector3(
+                            rgb[0] / 255,
+                            rgb[1] / 255,
+                            rgb[2] / 255
+                        );
+                    })
+                },
+                uInfo: { value: null },
             },
-            vertexShader: this.shaders.vertex,
+            vertexShader: this.shaders.vertexParticles,
             fragmentShader: this.shaders.fragment,
             transparent: true,
             depthWrite: false,
             blending: THREE.AdditiveBlending
         });
 
+        this.material.uniforms.uColors = { 
+            value: this.characters.map(charInfo => {
+                const rgb = chroma(charInfo.color).rgb();
+                return new THREE.Vector3(
+                    rgb[0] / 255,
+                    rgb[1] / 255,
+                    rgb[2] / 255
+                );
+            })
+        };
+
         this.count = this.size;
 
         const geometry = new THREE.BufferGeometry();
         const positions = new Float32Array(this.count * 3);
         const uvs = new Float32Array(this.count * 2);
-        const colors = new Float32Array(this.count * 3); // RGB pour chaque point
 
         for (let i = 0; i < this.size; i++) {
             const post = this.posts[i];
@@ -412,26 +516,31 @@ export default class Sketch {
             // Coordonnées UV correctes pour une texture 2D
             uvs[i * 2 + 0] = x / this.textureWidth;
             uvs[i * 2 + 1] = y / this.textureHeight;
-
-            // Obtenir les indices corrects pour les couleurs
-            const characterIndex = this.characterColorMap.get(post.character);
-            const thematicIndex = this.thematicColorMap.get(post.thematic);
-
-            // Convertir les couleurs hex en RGB
-            const characterColor = chroma(this.characterColors[characterIndex]).rgb();
-            const thematicColor = chroma(this.thematicColors[thematicIndex]).rgb();
-            
-            // Mélanger les deux couleurs
-            colors[i * 3 + 0] = characterColor[0] / 255; // R
-            colors[i * 3 + 1] = characterColor[1] / 255; // G
-            colors[i * 3 + 2] = characterColor[2] / 255; // B
         }
 
         geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
         geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
-        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+        // Récupérer la couleur du premier post
+        const firstPost = this.posts[0];
+        const characterColor = this.characters[this.characterColorMap.get(firstPost.character)];
+        const rgb = chroma(characterColor.color).rgb();
+        const initialColor = new THREE.Vector3(
+            rgb[0] / 255,
+            rgb[1] / 255,
+            rgb[2] / 255
+        );
 
         this.material.uniforms.uPosition.value = this.fboTexture;
+        this.material.uniforms.uInfo.value = this.infoTexture;
+        this.material.uniforms.uColors.value = this.characters.map(charInfo => {
+            const rgb = chroma(charInfo.color).rgb();
+            return new THREE.Vector3(
+                rgb[0] / 255,
+                rgb[1] / 255,
+                rgb[2] / 255
+            );
+        });
         this.points = new THREE.Points(geometry, this.material);
         this.points.frustumCulled = false;
         this.scene.add(this.points);
@@ -445,6 +554,11 @@ export default class Sketch {
 
     setupPane() {
         this.pane = new Pane();
+
+        const logFolder = this.pane.addFolder({ 
+            title: 'Log',
+            expanded: true 
+        });
 
         const layoutFolder = this.pane.addFolder({ 
             title: 'Layout',
@@ -470,11 +584,26 @@ export default class Sketch {
             toggleCapture: false,
             curlAmount: 0,
             frameDuration: 0.001,
-            cameraSpeed: 0.03,
+            cameraSpeed: 0.005,
             layout: 'Character',
             showAxes: false,
             showMouseTracker: false,
+            postLog: '',
+            postCharColor: '#ffffff'
         };
+
+        logFolder.addBinding(this.settings, 'postCharColor', {
+            view: 'color',
+            readonly: true,
+            label: 'Color'
+        });
+
+        logFolder.addBinding(this.settings, 'postLog', {
+            readonly: true,
+            multiline: true,
+            rows: 5,
+            label: 'Post Info'
+        });
 
         layoutFolder.addBinding(this.settings, 'layout', {
             options: {
@@ -483,7 +612,6 @@ export default class Sketch {
             },
             label: 'Layout'
         }).on('change', (ev) => {
-            // console.log('Layout changed to:', ev.value);
             this.updateLayout();
         });
 
@@ -496,8 +624,8 @@ export default class Sketch {
         shaderFolder.addBinding(this.settings, 'distortion', { min: 0, max: 1, step: .001, label: 'Distortion' });
         shaderFolder.addBinding(this.settings, 'distortionSpeed', { min: 0, max: 5, step: .001, label: 'Distortion speed' });
         controlsFolder.addBinding(this.settings, 'cameraSpeed', { 
-            min: 0.01, 
-            max: 1.0, 
+            min: 0.001, 
+            max: 0.5, 
             step: 0.01, 
             label: 'Camera Speed' 
         });
@@ -523,9 +651,9 @@ export default class Sketch {
         console.log("Layout changed to : ", this.settings.layout);
         
         if (this.settings.layout === 'Character') {
-            this.uniqueCharacters.forEach((character, index) => {
+            this.characters.forEach((character, index) => {
                 const angle = (index / this.distinctCharacters) * Math.PI * 2;
-                centers.set(character, {
+                centers.set(character.name, {
                     x: Math.cos(angle) * radius,
                     y: Math.sin(angle) * radius,
                     z: 0
@@ -541,6 +669,7 @@ export default class Sketch {
                 });
             });
         }
+        console.log('Centers:', centers);
 
         // Mettre à jour les positions cibles
         for (let i = 0; i < this.size; i++) {
@@ -614,7 +743,6 @@ export default class Sketch {
 
         this.material.uniforms.time.value = this.time;
         this.fboMaterial.uniforms.time.value = this.time;
-
     
         this.fboMaterial.uniforms.frameDuration.value = this.settings.frameDuration;
         this.fboMaterial.uniforms.curlAmount.value = this.settings.curlAmount;
@@ -646,6 +774,9 @@ export default class Sketch {
             this.material.uniforms.uPosition.value = this.fbo.texture;
     
             this.findNearestPoint();
+            
+            // Mettre à jour l'uniform avec l'index du point le plus proche
+            this.material.uniforms.uNearestPointIndex.value = this.nearestPointIndex;
 
             this.renderer.setRenderTarget(this.fbo);
             this.renderer.render(this.fboScene, this.fboCamera);
@@ -655,9 +786,6 @@ export default class Sketch {
             let temp = this.fbo;
             this.fbo = this.fbo1;
             this.fbo1 = temp;
-
-            // Mettre à jour l'uniform avec l'index du point le plus proche
-            this.material.uniforms.uNearestPointIndex.value = this.nearestPointIndex;
         }
     
         this.stats.end();
@@ -877,22 +1005,16 @@ export default class Sketch {
         // Mettre à jour l'index du point le plus proche
         this.nearestPointIndex = Math.floor(buffer[1]);
         
-        // Afficher les informations seulement si le point a changé
+        // Afficher les informations si le point est valide
         if (this.nearestPointIndex >= 0 && 
-            this.nearestPointIndex < this.posts.length && 
-            this.nearestPointIndex !== this.lastLoggedPointIndex) {
+            this.nearestPointIndex < this.posts.length) {
             
             const nearestPost = this.posts[this.nearestPointIndex];
-            console.log('Post le plus proche:', {
-                id: nearestPost.id,
-                distance: buffer[0],
-                character: nearestPost.character,
-                thematic: nearestPost.thematic,
-                index: this.nearestPointIndex
-            });
+            const character = this.characters.find(c => c.name === nearestPost.character);
             
-            // Mettre à jour le dernier point affiché
-            this.lastLoggedPointIndex = this.nearestPointIndex;
+            this.settings.postLog = `${nearestPost.uid}\n${nearestPost.character}\n${nearestPost.thematic}\n${character.numposts} posts`;
+
+            this.settings.postCharColor = character.color;
         }
         
         // Remettre le render target par défaut
@@ -902,7 +1024,7 @@ export default class Sketch {
 
 async function init() {
     // Charger les données et les shaders en parallèle
-    const [postsData, ...shaders] = await Promise.all([
+    const [postsData, fragment, vertexTemplate, simFragment, simVertex, nearestPointFragment] = await Promise.all([
         fetch('./assets/data/posts.json').then(r => r.json()),
         loadShader('./js/shader/fragment.glsl'),
         loadShader('./js/shader/vertexParticles.glsl'),
@@ -911,24 +1033,28 @@ async function init() {
         loadShader('./js/shader/nearestPointFragment.glsl')
     ]);
 
-    const [
-        fragment,
-        vertex,
-        simFragment,
-        simVertex,
-        nearestPointFragment
-    ] = shaders;
+    // Calculer le nombre de caractères distincts
+    const uniqueCharacters = [...new Set(postsData.map(post => post.character))];
+    const distinctCharacters = uniqueCharacters.length;
 
-    new Sketch({
+    // Remplacer PLACEHOLDER_NUM_CHARACTERS par la valeur réelle avant de créer le Sketch
+    const vertexShader = vertexTemplate.replace(
+        'PLACEHOLDER_NUM_CHARACTERS',
+        `${distinctCharacters}`
+    );
+
+    // console.log('Shader après remplacement:', vertexShader);
+
+    const sketch = new Sketch({
         dom: document.getElementById("container"),
         shaders: {
             fragment,
-            vertex,
+            vertexParticles: vertexShader,
             simFragment,
             simVertex,
             nearestPointFragment
         },
-        postsData // Passer les données au constructeur
+        postsData
     });
 }
 

@@ -7,6 +7,7 @@ uniform vec4 resolution;
 in vec2 vUv;
 in vec3 vColor;
 in float vIsNearest;
+in float vDebugIndex;
 
 out vec4 fragColor;
 

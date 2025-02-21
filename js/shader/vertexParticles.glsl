@@ -3,19 +3,29 @@ uniform int uNearestPointIndex;
 uniform mat4 modelViewMatrix;
 uniform mat4 projectionMatrix;
 uniform sampler2D uPosition;
+uniform sampler2D uInfo;
+
+uniform vec3 uColors[PLACEHOLDER_NUM_CHARACTERS];
 
 in vec3 position;
 in vec2 uv;
-in vec3 color;
 
 out vec2 vUv;
 out vec3 vPosition;
 out vec3 vColor;
 out float vIsNearest;
+out float vDebugIndex;
 
 void main() {
   vUv = uv;
-  vColor = color;
+  vec4 info = texture(uInfo, uv);
+  float characterIndex = info.a; // L'index du personnage est dans le canal alpha
+  vDebugIndex = characterIndex;
+  
+  // Récupérer la couleur du personnage dans le tableau
+  int colorIndex = int(characterIndex);
+  vColor = uColors[colorIndex];
+  
   vIsNearest = float(gl_VertexID == uNearestPointIndex);
 
   vec4 pos = texture(uPosition, uv);
