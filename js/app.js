@@ -1,19 +1,19 @@
-import * as THREE from "three";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
-import Stats from "stats.js";
-import { Pane } from "tweakpane";
-import postsData from '../assets/data/posts.json';
-import chroma from 'chroma-js';
+import * as THREE from 'https://unpkg.com/three@0.162.0/build/three.module.js';
+import Stats from 'https://cdnjs.cloudflare.com/ajax/libs/stats.js/17/Stats.js';
+import { Pane } from 'https://cdn.jsdelivr.net/npm/tweakpane@4.0.5/dist/tweakpane.min.js';
+import chroma from 'https://cdn.jsdelivr.net/npm/chroma-js@2.4.2/+esm';
 
-import fragment from "./shader/fragment.glsl";
-import vertex from "./shader/vertexParticles.glsl";
-import simFragment from "./shader/simFragment.glsl";
-import simVertex from "./shader/simVertex.glsl";
-import nearestPointFragment from "./shader/nearestPointFragment.glsl";
+import postsData from '../assets/data/posts.json';
+
+async function loadShader(url) {
+    const response = await fetch(url);
+    return await response.text();
+}
 
 export default class Sketch {
     constructor(options) {
         this.scene = new THREE.Scene();
+        this.shaders = options.shaders;
 
         this.container = options.dom;
         this.width = this.container.offsetWidth;
@@ -317,7 +317,8 @@ export default class Sketch {
         this.fboTexture.magFilter = THREE.NearestFilter;
         this.fboTexture.needsUpdate = true;
 
-        this.fboMaterial = new THREE.ShaderMaterial({
+        this.fboMaterial = new THREE.RawShaderMaterial({
+            glslVersion: THREE.GLSL3,
             uniforms: {
                 uPosition: { value: this.fboTexture },
                 uInfo: { value: null },
@@ -335,8 +336,8 @@ export default class Sketch {
                 curlAmount: { value: 0 },
                 uNearestPointIndex: { value: -1 },
             },
-            vertexShader: simVertex,
-            fragmentShader: simFragment
+            vertexShader: this.shaders.simVertex,
+            fragmentShader: this.shaders.simFragment
         });
 
         this.infoArray = new Float32Array(textureWidth * textureHeight * 4);
@@ -370,7 +371,8 @@ export default class Sketch {
     }
 
     addObjects() {
-        this.material = new THREE.ShaderMaterial({
+        this.material = new THREE.RawShaderMaterial({
+            glslVersion: THREE.GLSL3,
             extensions: {
                 derivatives: "#extension GL_OES_standard_derivatives : enable"
             },
@@ -381,8 +383,8 @@ export default class Sketch {
                 resolution: { value: new THREE.Vector4() },
                 uNearestPointIndex: { value: -1 },
             },
-            vertexShader: vertex,
-            fragmentShader: fragment,
+            vertexShader: this.shaders.vertex,
+            fragmentShader: this.shaders.fragment,
             transparent: true,
             depthWrite: false,
             blending: THREE.AdditiveBlending
@@ -830,20 +832,29 @@ export default class Sketch {
         this.nearestPointCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, -1, 1);
 
         // Créer le matériau avec le shader de calcul de distance
-        this.nearestPointMaterial = new THREE.ShaderMaterial({
+        this.nearestPointMaterial = new THREE.RawShaderMaterial({
+            glslVersion: THREE.GLSL3,
             uniforms: {
                 uPosition: { value: null },
                 uCameraPos: { value: this.camera.position },
-                textureSize: { value: this.textureWidth }
+                textureSize: { value: this.textureWidth },
+                modelViewMatrix: { value: new THREE.Matrix4() },
+                projectionMatrix: { value: new THREE.Matrix4() }
             },
-            vertexShader: `#version 300 es
-                varying vec2 vUv;
+            vertexShader: `
+                uniform mat4 modelViewMatrix;
+                uniform mat4 projectionMatrix;
+                
+                in vec3 position;
+                in vec2 uv;
+                out vec2 vUv;
+                
                 void main() {
                     vUv = uv;
                     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
                 }
             `,
-            fragmentShader: nearestPointFragment
+            fragmentShader: this.shaders.nearestPointFragment
         });
 
         // Créer le mesh pour le rendu
@@ -891,6 +902,33 @@ export default class Sketch {
     }
 }
 
-new Sketch({
-    dom: document.getElementById("container")
-});
+async function init() {
+    const shaders = await Promise.all([
+        loadShader('./js/shader/fragment.glsl'),
+        loadShader('./js/shader/vertexParticles.glsl'),
+        loadShader('./js/shader/simFragment.glsl'),
+        loadShader('./js/shader/simVertex.glsl'),
+        loadShader('./js/shader/nearestPointFragment.glsl')
+    ]);
+
+    const [
+        fragment,
+        vertex,
+        simFragment,
+        simVertex,
+        nearestPointFragment
+    ] = shaders;
+
+    new Sketch({
+        dom: document.getElementById("container"),
+        shaders: {
+            fragment,
+            vertex,
+            simFragment,
+            simVertex,
+            nearestPointFragment
+        }
+    });
+}
+
+init().catch(console.error);

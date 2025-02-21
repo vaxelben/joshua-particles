@@ -1,4 +1,3 @@
-#version 300 es
 precision highp float;
 
 uniform float time;
@@ -129,9 +128,9 @@ vec3 curl( in vec3 p, in float noiseTime, in float persistence ) {
 }
 
 void main() {
-    vec4 pos = texture2D(uPosition, vUv);
-    vec4 info = texture2D(uInfo, vUv);
-    vec4 targetPos = texture2D(uTargetPosition, vUv);
+    vec4 pos = texture(uPosition, vUv);
+    vec4 info = texture(uInfo, vUv);
+    vec4 targetPos = texture(uTargetPosition, vUv);
 
     // Normaliser la position actuelle pour obtenir la direction
     vec3 dir = normalize(pos.xyz);

@@ -1,4 +1,3 @@
-#version 300 es
 precision highp float;
 
 uniform sampler2D uPosition;
@@ -15,7 +14,7 @@ void main() {
     for(float y = 0.0; y < textureSize; y++) {
         for(float x = 0.0; x < textureSize; x++) {
             vec2 uv = vec2(x, y) / textureSize;
-            vec4 pos = texture2D(uPosition, uv);
+            vec4 pos = texture(uPosition, uv);
             
             if (pos.w > 0.0) {  // Vérifier si le point existe
                 float dist = length(pos.xyz - uCameraPos);
